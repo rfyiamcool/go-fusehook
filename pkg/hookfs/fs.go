@@ -153,7 +153,7 @@ func (h *HookFs) Rename(oldName string, newName string, context *fuse.Context) f
 		postHooked, posthookCtx, posthookErr := hook.PostRename(oldName, newName)
 		if postHooked {
 			log.WithFields(log.Fields{
-				"h":          h,
+				"h":           h,
 				"posthookErr": postHooked,
 				"posthookCtx": posthookCtx,
 			}).Debug("Rename: Posthooked")
