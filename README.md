@@ -41,4 +41,31 @@ $ fusermount -u "/mnt/hookfs-test"
 
 ### API Usage
 
-...
+```go
+import (
+	"time"
+
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
+
+	"github.com/rfyiamcool/go-fusehook/pkg/blkio"
+	"github.com/rfyiamcool/go-fusehook/pkg/hookfs"
+)
+
+func start(){
+	hs := blkio.Hook{}
+	hs.ReadLimiter = rate.NewLimiter(rate.Every(time.Second), 500_000)
+	hs.WriteLimiter = rate.NewLimiter(rate.Every(5 * time.Second), 100_000)
+
+	fs, err := hookfs.NewHookFs(v.original, v.mountpoint, &hs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	v.fuser, err = fs.ServeAsync()
+	if err != nil {
+		log.Errorf("failed to hookfs serve, err: %s", err.Error())
+	}
+	...
+}
+```
