@@ -75,7 +75,7 @@ func (v *blkioHook) start() {
 		log.Fatal(err)
 	}
 
-	log.Infof("start hookfs %s", fs)
+	log.Infof("start blkio hookfs server...")
 	log.Infof("Please run `fusermount -u %s` after using this, manually", v.mountpoint)
 	v.fuser, err = fs.ServeAsync()
 	if err != nil {
@@ -101,11 +101,11 @@ func (v *blkioHook) stop() {
 
 func (v *blkioHook) wait() {
 	sigch := make(chan os.Signal, 1)
-	signal.Notify(sigch, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP)
+	signal.Notify(sigch, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP)
 	for {
 		s := <-sigch
 		switch s {
-		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGHUP:
+		case syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP:
 			log.Infof("receive signal %s", s)
 			v.stop()
 			return
