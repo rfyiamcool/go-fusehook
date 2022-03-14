@@ -33,7 +33,7 @@ $ ./blkio --write-rate=100kb/1s --read-rate=100kb/1s "/mnt/hookfs-test" "/data/s
 ^C
 ```
 
-umount target path.
+when blkio process exits, automatically umount path. if can't umount path, manually umount.
 
 ```
 $ fusermount -u "/mnt/hookfs-test"
