@@ -2,9 +2,12 @@
 
 **feature**
 
-- control disk's block io ratelimit
+- control disk's block io rate
 - inject io error for custom path
-- more ...
+- io delay
+- more 
+
+![go-fusehook](./docs/fuse.jpg)
 
 some code from `https://github.com/osrg/hookfs`
 
