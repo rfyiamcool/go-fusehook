@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	readRate  = flag.String("read-rate", "", "disk read bytes ratelimit ( 200kb/s, 1mb/s, 100mb/m ), default no limit ")
+	readRate  = flag.String("read-rate", "", "disk read bytes ratelimit ( 200kb/s, 1mb/2s, 100mb/m ), default no limit ")
 	writeRate = flag.String("write-rate", "", "disk write bytes ratelimit ( 200kb/s, 1mb/s, 100mb/m ) ")
 	logLevel  = flag.String("level", "info", "setting log print level")
 )

@@ -20,9 +20,9 @@ var unitMap = map[string]ByteSize{
 
 // Used to convert user input to ByteSize
 var durationMap = map[string]time.Duration{
-	"S": 1 * time.Second,
-	"M": 1 * time.Minute,
-	"H": 1 * time.Hour,
+	"s": 1 * time.Second,
+	"m": 1 * time.Minute,
+	"h": 1 * time.Hour,
 }
 
 func ParseRateParam(args string) (ByteSize, time.Duration) {
@@ -49,6 +49,10 @@ func ParseRateParam(args string) (ByteSize, time.Duration) {
 }
 
 func ParseDuration(s string) (time.Duration, error) {
+	_, ok := durationMap[s]
+	if ok {
+		return time.ParseDuration("1" + s)
+	}
 	return time.ParseDuration(s)
 }
 
