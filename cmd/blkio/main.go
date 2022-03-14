@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/hanwen/go-fuse/fuse"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -24,10 +28,10 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func main() {
+func checkFlags() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "%s [OPTIONS] MOUNTPOINT ORIGINAL...\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", "blkio")
+		fmt.Fprintf(os.Stderr, "blkio  [OPTIONS]  MOUNTPOINT  ORIGINAL\n")
 		fmt.Fprintf(os.Stderr, "Options\n")
 		flag.PrintDefaults()
 	}
@@ -37,21 +41,22 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-
-	mountpoint := flag.Arg(0)
-	original := flag.Arg(1)
-
-	// setting log
-	level, err := log.ParseLevel(*logLevel)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	log.SetLevel(level)
-
-	serve(original, mountpoint)
 }
 
-func serve(original string, mountpoint string) {
+type blkioHook struct {
+	original   string
+	mountpoint string
+	fuser      *fuse.Server
+}
+
+func newBlkioHook(original, mountpoint string) blkioHook {
+	return blkioHook{
+		original:   original,
+		mountpoint: mountpoint,
+	}
+}
+
+func (v *blkioHook) start() {
 	hs := blkio.Hook{}
 	rrater, rdur := blkio.ParseRateParam(*readRate)
 	if rrater > 0 && rdur > 0 {
@@ -65,14 +70,77 @@ func serve(original string, mountpoint string) {
 		log.Infof("write ratelimit, every: %s, size: %v", wdur.String(), wrater)
 	}
 
-	fs, err := hookfs.NewHookFs(original, mountpoint, &hs)
+	fs, err := hookfs.NewHookFs(v.original, v.mountpoint, &hs)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Infof("Serving %s", fs)
-	log.Infof("Please run `fusermount -u %s` after using this, manually", mountpoint)
-	if err = fs.Serve(); err != nil {
-		log.Fatal(err)
+	log.Infof("start hookfs %s", fs)
+	log.Infof("Please run `fusermount -u %s` after using this, manually", v.mountpoint)
+	v.fuser, err = fs.ServeAsync()
+	if err != nil {
+		log.Errorf("failed to hookfs serve, err: %s", err.Error())
 	}
+}
+
+func (v *blkioHook) stop() {
+	// umount mountpoint path
+	if v.fuser == nil {
+		return
+	}
+
+	err := v.fuser.Unmount()
+	if err == nil {
+		log.Infof("umount path %s successfully", v.mountpoint)
+		return
+	}
+
+	// retry by fusermount3
+	exec.Command("fusermount3", "-u", v.mountpoint).Run()
+}
+
+func (v *blkioHook) wait() {
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP)
+	for {
+		s := <-sigch
+		switch s {
+		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGHUP:
+			log.Infof("receive signal %s", s)
+			v.stop()
+			return
+
+		default:
+			log.Infof("receive unknown signal %s", s)
+			continue
+		}
+	}
+}
+
+func main() {
+	checkFlags()
+
+	mountpoint := flag.Arg(0)
+	original := flag.Arg(1)
+	if mountpoint == "" || original == "" {
+		log.Fatal("mountpoint or original must not be empty")
+	}
+
+	// setting log
+	level, err := log.ParseLevel(*logLevel)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	log.SetLevel(level)
+
+	// check fuse3
+	cmd := exec.Command("which", "fusermount")
+	err = cmd.Run()
+	if err != nil || cmd.ProcessState.ExitCode() != 0 {
+		log.Fatal("can't find fusermount command in path, please install fuse3")
+	}
+
+	hook := newBlkioHook(original, mountpoint)
+	hook.start()
+	hook.wait()
 }
